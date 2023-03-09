@@ -39,5 +39,9 @@ A new save file will only be generated if both text files contain all of the nam
   - I have only used this on a vanilla save, but my guess is probably! Make a backup of your original save just in case though.
 - What if I have several Stations/Trains of the same name?
   - No worries! They will stay in the same order. (If you have 2 Trains named "Train", the first "Train" in the list will remain the first.)
+- Does rearranging the Stations mess with any of the Self-Driving Trains?
+  - No, all Trains will continue working as intended. This tool only changes the Time Table's list order.
+- Does this tool work with several seperated rail networks?
+  - Yes, it'll work. If you have separate rail networks it will put all Stations and Trains into the same text file, but the game will still know that they are separate networks.
 - Will you make a version with a proper user interface?
   - I have no plans for it, this currently works well enough for me. Feel free to fork and improve it though!
