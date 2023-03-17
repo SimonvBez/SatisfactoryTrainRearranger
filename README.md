@@ -3,10 +3,10 @@ A tool to rearrange the order of Train Stations and Trains in the Time Table men
 
 ## The problem
 The Stations in the Time Table menu are ordered by the time they were built,
-and when an older Station is destroyed, the Station at the bottom of the list (the newest) will jump up in the list to take its place.
+and when an older Station is destroyed, the Station at the bottom of the list (the newest) will jump up in the list to take the destroyed station's place.
 When building a larger rail network this can lead to some pretty nasty and unorganised lists.
 
-Or perhaps you'd like some stations to be at the top of the list because they're used more often. Like an on-demand Mall Train system.
+Or perhaps you'd like some stations to be at the top of the list because they're used more often. Like an on-demand Train Mall system.
 
 Satisfactory currently does not have a way of changing the order of Stations and Trains, which is why I wrote this tool!
 
@@ -17,7 +17,7 @@ Satisfactory currently does not have a way of changing the order of Stations and
 
 ## What it can not do
 - Edit the names of Stations and Trains.
-- Remove or add Stations/Trains
+- Remove or add Stations/Trains.
 - Change the order in which Stations and Trains appear in the Map's menu.
 - Do anything with non-train vehicles.
 
@@ -38,9 +38,9 @@ A new save file will only be generated if both text files contain all of the nam
 - Does this work with mods?
   - I have only used this on a vanilla save, but my guess is probably! Make a backup of your original save just in case though.
 - What if I have several Stations/Trains of the same name?
-  - No worries! They will stay in the same order. (If you have 2 Trains named "Train", the first "Train" in the list will remain the first.)
+  - No worries! Though they can only keep the same relative order. Meaning if you have 2 Trains named "ChooChoo", the first "ChooChoo" in the new list will always be the first "ChooChoo" in the old list.
 - Does rearranging the Stations mess with any of the Self-Driving Trains?
-  - No, all Trains will continue working as intended. This tool only changes the Time Table's list order.
+  - No, all Trains will continue working as intended. This tool only changes the Time Table's visual list order.
 - Does this tool work with several seperated rail networks?
   - Yes, it'll work. If you have separate rail networks it will put all Stations and Trains into the same text file, but the game will still know that they are separate networks.
 - Will you make a version with a proper user interface?
