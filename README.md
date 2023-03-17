@@ -15,21 +15,22 @@ Satisfactory currently does not have a way of changing the order of Stations and
 ## What this tool can do
 - Change the order in which the Stations and Trains appear in the Time Table menu.
 
-## What it can not do
+## What this tool can not do
 - Edit the names of Stations and Trains.
 - Remove or add Stations/Trains.
 - Change the order in which Stations and Trains appear in the Map's menu.
 - Do anything with non-train vehicles.
 
 ## Usage
-1. Download and install [Python](https://www.python.org/downloads/), to be able to run the script.
-2. Download train_rearrenger.py from this repo.
-3. In file explorer, drag and drop your savefile onto the train_rearrenger.py file.
-4. Two text files will be created: `station list.txt` and `train list.txt`. Read the program's instructions and edit the files to your liking.
+1. Download the latest `train_rearranger.exe` from the [Release page](https://github.com/SimonvBez/SatisfactoryTrainRearranger/releases/).
+(Some antiviruses might not like this. Create an exception, or consider to run from source instead of using the release .exe)
+   - If you rather run from source instead of downloading a release, download and install [Python](https://www.python.org/downloads/) and download [train_rearrenger.py](./train_rearranger.py) from this repo.
+2. In file explorer, drag and drop your savefile onto the `train_rearrenger.exe/py` file.
+3. Two text files will be created: `station list.txt` and `train list.txt`. Read the program's instructions and edit the files to your liking.
 ![](./img/reorder_instructions.png)
-5. Don't forget to save the text files!
-6. Press any key in the program's window to read the new orders from the files. If no names are missing, misspelled or duplicated a new save file will be generated.
-7. Put the new save file in Satisfactory's SaveGames folder and enjoy!
+4. Don't forget to save the text files!
+5. Press Enter in the program's window to read the new orders from the files. If no names are missing, misspelled or duplicated a new save file will be generated.
+6. Put the new save file in Satisfactory's SaveGames folder and enjoy!
 
 ## FAQ
 - What if I mess up one of the text files (like if I misspelled or missed a name)?
@@ -38,7 +39,7 @@ A new save file will only be generated if both text files contain all of the nam
 - Does this work with mods?
   - I have only used this on a vanilla save, but my guess is probably! Make a backup of your original save just in case though.
 - What if I have several Stations/Trains of the same name?
-  - No worries! Though they can only keep the same relative order. Meaning if you have 2 Trains named "ChooChoo", the first "ChooChoo" in the new list will always be the first "ChooChoo" in the old list.
+  - No worries! Though they can only stay in the same relative order. Meaning if you have 2 Trains named "ChooChoo", the first "ChooChoo" in the old list will always be the first "ChooChoo" in the new list, second the second, etc.
 - Does rearranging the Stations mess with any of the Self-Driving Trains?
   - No, all Trains will continue working as intended. This tool only changes the Time Table's visual list order.
 - Does this tool work with several seperated rail networks?
