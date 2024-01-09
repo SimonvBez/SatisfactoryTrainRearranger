@@ -155,13 +155,14 @@ class Actor:
 
 class DataCursor:
     def __init__(self, data):
-        self.data = data
+        self.data: bytes = data
         self.cursor = 0
 
     def __len__(self):
         return len(self.data)
 
     def read(self, length: int | None = None):
+        # print("read", length)
         if length is None:
             result = self.data[self.cursor:]
             self.cursor = len(self.data)
@@ -232,12 +233,14 @@ class DataCursor:
             raise IndexError("Position out of data range")
 
     def skip(self, length):
+        # print("skip", length)
         self.cursor += length
 
 
 class SaveDataCursor(DataCursor):
-    def __init__(self, data):
+    def __init__(self, data, save_file_version=None):
         super().__init__(data)
+        self.save_file_version = save_file_version
         # Keep track of the name, start and end position and number of elements in each array that is found
         self.array_cursors: dict[bytes, tuple[int, int, int]] = {}
 
@@ -279,10 +282,14 @@ class SaveDataCursor(DataCursor):
         return Actor(class_name, path_name)
 
     def skip_entity(self):
+        if self.save_file_version >= 41:
+            self.skip(8)  # entity save version + int32
         entity_length = self.read_int32()
         self.skip(entity_length)
 
     def read_entity(self, obj: Object | Actor):
+        if self.save_file_version >= 41:
+            self.skip(8)  # entity save version + int32
         entity_length = self.read_int32()
         start_cursor = self.cursor
         if isinstance(obj, Actor):
@@ -291,6 +298,7 @@ class SaveDataCursor(DataCursor):
             for _ in range(child_count):
                 obj.children.append(self.read_object_reference())
 
+        # Read properties
         while True:
             prop = self.read_property()
             if prop is None:
@@ -512,46 +520,67 @@ class SaveTrainParser:
     def __init__(self, file_object):
         self.savefile = SaveDataCursor(file_object.read())
 
-        self.package_file_tag: int | None = None
-        self.max_chunk_size: int | None = None
+        # self.package_file_tag: int | None = None
+        self.max_chunk_size = 0
+        self.save_header_version = 0
+        self.save_file_version = 0
         self.header_length = 0
+        self.chunk_header_begin: bytes | None = None
 
         self.railroad_system: Actor | None = None
         self.train_station_identifiers: dict[bytes, Actor] = {}
         self.trains: dict[bytes, Actor] = {}
 
-        self.header: SaveHeader = self.parse_header()
-        self.body = SaveDataCursor(self.unzip_body())
+        # self.header: SaveHeader = self.parse_header()
+        self.header = self.read_header()
+        self.body = SaveDataCursor(self.unzip_body(), self.save_file_version)
         self.parse_body()
 
-    def parse_header(self) -> SaveHeader:
-        header = SaveHeader(self.savefile.read_int32(),
-                            self.savefile.read_int32(),
-                            self.savefile.read_int32(),
-                            self.savefile.read_string().string,
-                            self.savefile.read_string().string,
-                            self.savefile.read_string().string,
-                            self.savefile.read_int32(),
-                            self.savefile.read_int64(),
-                            self.savefile.read_uint8(),
-                            self.savefile.read_int32(),
-                            self.savefile.read_string().string,
-                            self.savefile.read_int32(),
-                            self.savefile.read_string().string)
-        self.header_length = self.savefile.cursor
-        return header
+    def read_header(self) -> bytes:
+        self.save_header_version = self.savefile.read_int32()
+        self.save_file_version = self.savefile.read_int32()
+        self.header_length = self.savefile.data.find(b"\xC1\x83\x2A\x9E")
+        if self.header_length == -1:
+            raise ValueError("Start of compressed body not found")
+        self.savefile.seek(0)
+        return self.savefile.read(self.header_length)
+
+    # def parse_header(self) -> SaveHeader:
+    #     header = SaveHeader(self.savefile.read_int32(),
+    #                         self.savefile.read_int32(),
+    #                         self.savefile.read_int32(),
+    #                         self.savefile.read_string().string,
+    #                         self.savefile.read_string().string,
+    #                         self.savefile.read_string().string,
+    #                         self.savefile.read_int32(),
+    #                         self.savefile.read_int64(),
+    #                         self.savefile.read_uint8(),
+    #                         self.savefile.read_int32(),
+    #                         self.savefile.read_string().string,
+    #                         self.savefile.read_int32(),
+    #                         self.savefile.read_string().string)
+    #     self.header_length = self.savefile.cursor
+    #     return header
 
     def unzip_body(self) -> bytes:
         print("Decompressing...", end="", flush=True)
-        inflated_chunks = []
-        while chunk_header := DataCursor(self.savefile.read(48)):
-            if self.package_file_tag is None:
-                self.package_file_tag = chunk_header.read_uint64()
-            if self.max_chunk_size is None:
-                self.max_chunk_size = chunk_header.read_uint64()
+        if self.save_file_version >= 41:
+            chunk_header_length = 49
+            chunk_header_begin_length = 17
+        else:
+            chunk_header_length = 48
+            chunk_header_begin_length = 16
 
-            chunk_header.seek(16)
-            current_chunk_size = chunk_header.read_uint64()
+        inflated_chunks = []
+        while chunk_header := DataCursor(self.savefile.read(chunk_header_length)):
+            if self.chunk_header_begin is None:
+                chunk_header.seek(8)
+                self.max_chunk_size = chunk_header.read_uint32()
+                chunk_header.seek(0)
+                self.chunk_header_begin = chunk_header.read(chunk_header_begin_length)
+
+            chunk_header.seek(chunk_header_begin_length)
+            current_chunk_size = chunk_header.read_uint32()
             current_chunk = self.savefile.read(current_chunk_size)
 
             inflated_chunks.append(zlib.decompress(current_chunk))
@@ -580,13 +609,33 @@ class SaveTrainParser:
 
     def parse_body(self):
         print("Parsing...", end="", flush=True)
-        self.body.seek(4)
+        if self.save_file_version >= 41:
+            self.body.skip(8)
+            grid_count = self.body.read_int32()
+            self.body.skip_string()
+            self.body.skip(12)  # int64 + int32
+            self.body.skip_string()
+            self.body.skip(4)  # int32
+            for _ in range(1, grid_count):
+                self.body.skip_string()
+                self.body.skip(8)  # int32 + int32
+                partition_count = self.body.read_int32()
+                for _ in range(partition_count):
+                    self.body.skip_string()
+                    self.body.skip(4)  # uint32
+        else:
+            self.body.skip(4)
+
         nb_levels = self.body.read_int32()
         for level_i in range(nb_levels+1):
             if level_i < nb_levels:
                 self.body.skip_string()  # level_name
 
-            self.body.read_int32()  # objectsBinaryLength
+            if self.save_file_version >= 41:
+                objects_length = self.body.read_int64()
+            else:
+                objects_length = self.body.read_int32()
+            objects_start_cursor = self.body.cursor
             objects_count = self.body.read_int32()
             entities_to_objects: list[Object | Actor] = []
             for _ in range(objects_count):
@@ -601,12 +650,17 @@ class SaveTrainParser:
                     case _:
                         raise ValueError(f"Unknown object type: {object_type}")
 
-            collected_count = self.body.read_int32()
-            if collected_count > 0:
-                for _ in range(collected_count):
-                    self.body.skip_object_property()
+            if not self.save_file_version >= 41 or self.body.cursor < objects_start_cursor + objects_length:
+                collected_count = self.body.read_int32()
+                if collected_count > 0:
+                    for _ in range(collected_count):
+                        self.body.skip_object_property()
 
-            self.body.skip(4)  # entitiesBinaryLength
+            # entitiesBinaryLength
+            if self.save_file_version >= 41:
+                self.body.skip(8)
+            else:
+                self.body.skip(4)
 
             self.body.skip(4)  # entities count
             for obj in entities_to_objects:
