@@ -6,6 +6,9 @@ import sys
 import traceback
 
 
+LATEST_SUPPORTED_SAVE_VERSION = 42
+
+
 @dataclass
 class SaveHeader:
     save_header_type: int
@@ -162,7 +165,6 @@ class DataCursor:
         return len(self.data)
 
     def read(self, length: int | None = None):
-        # print("read", length)
         if length is None:
             result = self.data[self.cursor:]
             self.cursor = len(self.data)
@@ -233,7 +235,6 @@ class DataCursor:
             raise IndexError("Position out of data range")
 
     def skip(self, length):
-        # print("skip", length)
         self.cursor += length
 
 
@@ -437,8 +438,6 @@ class SaveDataCursor(DataCursor):
             case b"ObjectProperty" | b"InterfaceProperty":
                 for _ in range(array_property_count):
                     values.append(self.read_object_reference())
-            case b"Object" | b"Interface":
-                raise ValueError("Object or Interface encountered. Please rename!")
             case _:
                 raise NotImplementedError
         array_end_cursor = self.cursor
@@ -449,70 +448,19 @@ class SaveDataCursor(DataCursor):
         value_type = self.read_string().string
         self.skip(17)
 
-        match value_type:
-            case b"Color":
-                value_dict = {"b": self.read_uint8(),
-                              "g": self.read_uint8(),
-                              "r": self.read_uint8(),
-                              "a": self.read_uint8()}
-            case b"LinearColor":
-                value_dict = {"b": self.read_float(),
-                              "g": self.read_float(),
-                              "r": self.read_float(),
-                              "a": self.read_float()}
-            case b"Vector" | b"Rotator":
-                value_dict = {"x": self.read_float(),
-                              "y": self.read_float(),
-                              "z": self.read_float()}
-            case b"Vector2D":
-                value_dict = {"x": self.read_float(),
-                              "y": self.read_float()}
-            case b"Quat" | b"Vector4":
-                value_dict = {"a": self.read_float(),
-                              "b": self.read_float(),
-                              "c": self.read_float(),
-                              "d": self.read_float()}
-            case b"Box":
-                value_dict = {"min": {
-                                  "x": self.read_float(),
-                                  "y": self.read_float(),
-                                  "z": self.read_float()
-                              },
-                              "max": {
-                                  "x": self.read_float(),
-                                  "y": self.read_float(),
-                                  "z": self.read_float()
-                              },
-                              "is_valid": self.read_uint8()}
-            case b"RailroadTrackPosition":
-                value_dict = {"object": self.read_object_reference(),
-                              "offset": self.read_float(),
-                              "forward": self.read_float()}
-            case b"TimeHandle":
-                value_dict = {"handle": self.read_string().string}
-            case b"Guid":
-                value_dict = {"guid": self.read(16)}
-            case b"InventoryItem":
-                value_dict = {"unk1": self.read_int32(),
-                              "item_name": self.read_string().string,
-                              "object": self.read_object_reference(),
-                              "property": self.read_property()}
-            case b"FluidBox":
-                value_dict = {"value": self.read_float()}
-            case b"SlateBrush":
-                value_dict = {"unk1": self.read_string().string}
-            case _:
-                values = []
-                while True:
-                    sub_struct_property = self.read_property()
-                    if sub_struct_property is None:
-                        break
-                    values.append(sub_struct_property)
-                    if isinstance(sub_struct_property, StructProperty) \
-                            and sub_struct_property.value_type == b"InventoryItem" \
-                            and sub_struct_property.value_dict["property"] is None:
-                        break
-                value_dict = {"values": values}
+        # Because this script only limits itself to RailroadSubsystem, FGTrainStationIdentifier and BP_Train_C,
+        # it only needs to be able to parse generic struct value types
+        values = []
+        while True:
+            sub_struct_property = self.read_property()
+            if sub_struct_property is None:
+                break
+            values.append(sub_struct_property)
+            if isinstance(sub_struct_property, StructProperty) \
+                    and sub_struct_property.value_type == b"InventoryItem" \
+                    and sub_struct_property.value_dict["property"] is None:
+                break
+        value_dict = {"values": values}
         return value_type, value_dict
 
 
@@ -520,7 +468,6 @@ class SaveTrainParser:
     def __init__(self, file_object):
         self.savefile = SaveDataCursor(file_object.read())
 
-        # self.package_file_tag: int | None = None
         self.max_chunk_size = 0
         self.save_header_version = 0
         self.save_file_version = 0
@@ -531,7 +478,6 @@ class SaveTrainParser:
         self.train_station_identifiers: dict[bytes, Actor] = {}
         self.trains: dict[bytes, Actor] = {}
 
-        # self.header: SaveHeader = self.parse_header()
         self.header = self.read_header()
         self.body = SaveDataCursor(self.unzip_body(), self.save_file_version)
         self.parse_body()
@@ -539,28 +485,15 @@ class SaveTrainParser:
     def read_header(self) -> bytes:
         self.save_header_version = self.savefile.read_int32()
         self.save_file_version = self.savefile.read_int32()
+        if self.save_file_version > LATEST_SUPPORTED_SAVE_VERSION:
+            print("This save file version is using a newer version than this tool is currently updated for.")
+            print("It may work, but if any errors occur, please create an Issue on GitHub to let me know.")
+
         self.header_length = self.savefile.data.find(b"\xC1\x83\x2A\x9E")
         if self.header_length == -1:
             raise ValueError("Start of compressed body not found")
         self.savefile.seek(0)
         return self.savefile.read(self.header_length)
-
-    # def parse_header(self) -> SaveHeader:
-    #     header = SaveHeader(self.savefile.read_int32(),
-    #                         self.savefile.read_int32(),
-    #                         self.savefile.read_int32(),
-    #                         self.savefile.read_string().string,
-    #                         self.savefile.read_string().string,
-    #                         self.savefile.read_string().string,
-    #                         self.savefile.read_int32(),
-    #                         self.savefile.read_int64(),
-    #                         self.savefile.read_uint8(),
-    #                         self.savefile.read_int32(),
-    #                         self.savefile.read_string().string,
-    #                         self.savefile.read_int32(),
-    #                         self.savefile.read_string().string)
-    #     self.header_length = self.savefile.cursor
-    #     return header
 
     def unzip_body(self) -> bytes:
         print("Decompressing...", end="", flush=True)
@@ -590,19 +523,17 @@ class SaveTrainParser:
     def write_file(self, filename):
         with open(filename, "wb") as f:
             self.savefile.seek(0)
-            f.write(self.savefile.read(self.header_length))  # Copy the original header
+            f.write(self.savefile.read(self.header_length))  # Write the original header
 
             self.body.seek(0)
             print("Compressing...", end="", flush=True)
             while chunk_uncompressed := self.body.read(self.max_chunk_size):
                 compressed_chunk = zlib.compress(chunk_uncompressed)
-                chunk_header = struct.pack("QQQQQQ",
-                                           self.package_file_tag,
-                                           self.max_chunk_size,
-                                           len(compressed_chunk),
-                                           len(chunk_uncompressed),
-                                           len(compressed_chunk),
-                                           len(chunk_uncompressed))
+                chunk_header = self.chunk_header_begin + struct.pack("QQQQ",
+                                                                     len(compressed_chunk),
+                                                                     len(chunk_uncompressed),
+                                                                     len(compressed_chunk),
+                                                                     len(chunk_uncompressed))
                 f.write(chunk_header)
                 f.write(compressed_chunk)
         print("Done")
@@ -652,9 +583,8 @@ class SaveTrainParser:
 
             if not self.save_file_version >= 41 or self.body.cursor < objects_start_cursor + objects_length:
                 collected_count = self.body.read_int32()
-                if collected_count > 0:
-                    for _ in range(collected_count):
-                        self.body.skip_object_property()
+                for _ in range(collected_count):
+                    self.body.skip_object_property()
 
             # entitiesBinaryLength
             if self.save_file_version >= 41:
@@ -678,9 +608,8 @@ class SaveTrainParser:
                     self.body.skip_entity()
 
             collected_count = self.body.read_int32()
-            if collected_count > 0:
-                for _ in range(collected_count):
-                    self.body.skip_object_property()
+            for _ in range(collected_count):
+                self.body.skip_object_property()
         print("Done")
 
     def edit_array(self, array_name: bytes, array_objects: list[ObjectReference]):
@@ -723,6 +652,45 @@ class SaveTrainParser:
                 train_name = property_train_name.prop_dict["value"]
             result.append((train_name, train_array_entry))
         return result
+
+
+def read_new_order(filename: str, original_entries: list[tuple[String, ObjectReference]], entry_type: str) -> list[ObjectReference]:
+    with open(filename, "r", encoding="utf-8") as f:
+        new_entry_name_order = [line.rstrip("\n") for line in f]
+
+    original_entries_copy = original_entries.copy()
+    new_array_object_refs = []
+
+    for line_number, new_name in enumerate(new_entry_name_order):
+        entry_found = False
+        for orig_i, orig_entry in enumerate(original_entries_copy):
+            orig_name, orig_object_ref = orig_entry
+            if new_name == orig_name.decode():
+                new_array_object_refs.append(orig_object_ref)
+                entry_found = True
+                del original_entries_copy[orig_i]
+                break
+
+        if not entry_found:
+            print(f'\nError on line {line_number}: {entry_type} "{new_name}" does not exist, or is already used on a line above')
+            print(f'Correct "{filename}" and try again')
+            wait_for_enter()
+            return read_new_order(filename, original_entries, entry_type)
+
+    if len(new_entry_name_order) != len(original_entries):
+        print(f"\nError! One or more {entry_type}s are missing from the text file: ")
+        missing_names = []
+        for orig_name, _ in original_entries:
+            orig_name_str = orig_name.decode()
+            if orig_name_str not in new_entry_name_order:
+                missing_names.append(orig_name_str)
+        print(", ".join(missing_names))
+        print(f'Correct "{filename}" and try again.')
+        wait_for_enter()
+        return read_new_order(filename, original_entries, entry_type)
+
+    os.remove(filename)
+    return new_array_object_refs
 
 
 def wait_for_enter():
@@ -768,95 +736,15 @@ def main():
     print()
     wait_for_enter()
 
-    while True:
-        with open("station list.txt", "r", encoding="utf-8") as f:
-            new_station_name_order = [line.replace("\n", "") for line in f]
-
-        station_entries_copy = station_entries.copy()
-        new_station_array_entries = []
-        has_unknown_station = False
-        for line_number, new_name in enumerate(new_station_name_order):
-            station_found = False
-
-            for i_orig, orig_station in enumerate(station_entries_copy):
-                orig_name, orig_entry = orig_station
-                if new_name == orig_name.decode():
-                    new_station_array_entries.append(orig_entry)
-                    station_found = True
-                    del station_entries_copy[i_orig]
-                    break
-
-            if not station_found:
-                print(f'\nError line {line_number}: station "{new_name}" is unknown or is already on a line above')
-                print('Correct "station list.txt" and try again.')
-                wait_for_enter()
-                has_unknown_station = True
-                break
-
-        if has_unknown_station:
-            continue  # Re-read station list.txt and try again
-
-        if len(new_station_name_order) != len(station_entries):
-            print("\nError: one or more stations are missing: ")
-            missing_stations = []
-            for orig_name, _ in station_entries:
-                orig_name_str = orig_name.decode()
-                if orig_name_str not in new_station_name_order:
-                    missing_stations.append(orig_name_str)
-            print(", ".join(missing_stations))
-            print('Correct "station list.txt" and try again.')
-            wait_for_enter()
-            continue  # Re-read station list.txt and try again
-        break
-    os.remove("station list.txt")
-
-    while True:
-        with open("train list.txt", "r", encoding="utf-8") as f:
-            new_train_name_order = [line.replace("\n", "") for line in f]
-
-        train_entries_copy = train_entries.copy()
-        new_train_array_entries = []
-        has_unknown_train = False
-        for line_number, new_name in enumerate(new_train_name_order):
-            train_found = False
-
-            for i_orig, orig_train in enumerate(train_entries_copy):
-                orig_name, orig_entry = orig_train
-                if new_name == orig_name.decode():
-                    new_train_array_entries.append(orig_entry)
-                    train_found = True
-                    del train_entries_copy[i_orig]
-                    break
-
-            if not train_found:
-                print(f'\nError {line_number}: train "{new_name}" is unknown or is already on a line above')
-                print('Correct "train list.txt" and try again.')
-                wait_for_enter()
-                has_unknown_train = True
-                break
-
-        if has_unknown_train:
-            continue  # Re-read train list.txt and try again
-
-        if len(new_train_name_order) != len(train_entries):
-            print("\nError: one or more trains are missing: ")
-            missing_trains = []
-            for orig_name, _ in train_entries:
-                orig_name_str = orig_name.decode()
-                if orig_name_str not in new_train_name_order:
-                    missing_trains.append(orig_name_str)
-            print(", ".join(missing_trains))
-            print('Correct "train list.txt" and try again.')
-            wait_for_enter()
-            continue  # Re-read train list.txt and try again
-        break
-    os.remove("train list.txt")
+    new_station_array_entries = read_new_order("station list.txt", station_entries, "Station")
+    new_train_array_entries = read_new_order("train list.txt", train_entries, "Train")
 
     parser.edit_array(b"mTrainStationIdentifiers", new_station_array_entries)
     parser.edit_array(b"mTrains", new_train_array_entries)
 
     print()
     parser.write_file(output_save_filename)
+    print("Success!")
     print(f'Save file saved as "{output_save_filename}"\n')
     input("Press Enter to close...")
 
@@ -867,4 +755,3 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         input("Press Enter to close...")
-
