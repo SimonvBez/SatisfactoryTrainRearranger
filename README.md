@@ -1,5 +1,6 @@
 # Satisfactory Train Rearranger
 A tool to rearrange the order of Train Stations and Trains in the Time Table menu by editing the save file.
+Currently updated for at least Update 8, v0.8.3.1 (build 268809).
 
 ## The problem
 The Stations in the Time Table menu are ordered by the time they were built,
