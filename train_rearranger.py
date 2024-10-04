@@ -83,10 +83,8 @@ class SaveTrainParser:
         self.chunk_header_begin: bytes | None = None
 
         self.train_station_order_array: tuple[int, int, list[SaveDataObjectReference]] | None = None
-        self.train_order_array: tuple[int, int, list[SaveDataObjectReference]] | None = None
 
         self.train_stations: dict[SaveDataObjectReference, SaveDataString] | None = None
-        self.trains: dict[SaveDataObjectReference, SaveDataString] | None = None
 
         self.parse(file_object)
 
@@ -137,21 +135,17 @@ class SaveTrainParser:
 
     def quick_parse_body(self):
         print("Parsing...", end="", flush=True)
-        # Get the arrays which hold the order of stations and trains in the Time Table menu
+        # Get the arrays which hold the order of stations in the Time Table menu
         self.train_station_order_array = self.find_and_read_array("mTrainStationIdentifiers")
-        self.train_order_array = self.find_and_read_array("mTrains")
 
         # Get the objects, in order of how they appear in the save file
         train_station_references = self.find_present_objects("/Script/FactoryGame.FGTrainStationIdentifier")
-        train_references = self.find_present_objects("/Game/FactoryGame/Buildable/Vehicle/Train/-Shared/BP_Train.BP_Train_C")
 
-        # Get the names of stations and trains, which will be in the same order as the object references
+        # Get the names of stations, which will be in the same order as the object references
         train_station_names = self.find_present_text_properties("mStationName")
-        train_names = self.find_present_text_properties("mTrainName")
 
-        # Zip the objects and their names into dicts, so the name of every object can easily be retrieved
+        # Zip the objects and their names into a dict, so the name of every object can be easily retrieved
         self.train_stations = dict(zip(train_station_references, train_station_names))
-        self.trains = dict(zip(train_references, train_names))
         print("Done")
 
     def write_file(self, filename: str):
@@ -228,20 +222,8 @@ class SaveTrainParser:
             result.append((station_object, self.train_stations[station_object]))
         return result
 
-    def get_train_entries(self) -> list[tuple[SaveDataObjectReference, SaveDataString]]:
-        """
-        Get a list of all train objects and their names, ordered by how they appear in the Time Table menu
-        """
-        result = []
-        for station_object in self.train_order_array[2]:
-            result.append((station_object, self.trains[station_object]))
-        return result
-
     def reorder_train_stations(self, new_order: list[SaveDataObjectReference]):
         self.reorder_array(self.train_station_order_array, new_order)
-
-    def reorder_trains(self, new_order: list[SaveDataObjectReference]):
-        self.reorder_array(self.train_order_array, new_order)
 
     def reorder_array(self, original_array: tuple[int, int, list[SaveDataObjectReference]], new_order: list[SaveDataObjectReference]):
         body_array_start, body_array_end, original_order = original_array
@@ -313,16 +295,10 @@ def main():
         parser = SaveTrainParser(f)
 
     station_entries = parser.get_stations_entries()
-    train_entries = parser.get_train_entries()
 
     with open("station list.txt", "w", encoding="utf-8") as f:
         for station_entry, station_name in station_entries:
             f.write(station_name.decode())
-            f.write("\n")
-
-    with open("train list.txt", "w", encoding="utf-8") as f:
-        for train_entry, train_name in train_entries:
-            f.write(train_name.decode())
             f.write("\n")
 
     path, filename = os.path.split(input_save_path)
@@ -330,21 +306,19 @@ def main():
     output_save_filename = f"{name}_REORDERED{extension}"
 
     print()
-    print("Created 'station list.txt' and 'train list.txt'.")
-    print("Rearrange the order of the names to your liking in a text editor, and save.")
+    print("Created 'station list.txt'.")
+    print("Rearrange the order of the Station names to your liking in a text editor, and save.")
     print("NOTE: Exactly one name per line, names can not be changed; only reordered.")
     print()
-    print("After saving, press Enter in this window to read the new orders from the text files.")
+    print("After saving, press Enter in this window to read the new order from the text file.")
     print("This will generate a new edited save file.")
     print(f"Output save file will be called {output_save_filename!r}.")
     print()
     wait_for_enter()
 
     new_station_array_entries = read_new_order("station list.txt", station_entries, "Station")
-    new_train_array_entries = read_new_order("train list.txt", train_entries, "Train")
 
     parser.reorder_train_stations(new_station_array_entries)
-    parser.reorder_trains(new_train_array_entries)
 
     print()
     parser.write_file(output_save_filename)
