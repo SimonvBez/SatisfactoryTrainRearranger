@@ -1,11 +1,11 @@
 # Satisfactory Train Rearranger
 A tool to rearrange the order of Train Stations and Trains in the Time Table menu by editing the save file.
-Currently updated for at least Update 8, v0.8.3.1 (build 268809).
+Currently updated for at least Update 1.0, v1.0.0.3 (build 368883).
 
 ## The problem
 The Stations in the Time Table menu are ordered by the time they were built,
 and when an older Station is destroyed, the Station at the bottom of the list (the newest) will jump up in the list to take the destroyed station's place.
-When building a larger rail network this can lead to some pretty nasty and unorganised lists.
+When building a larger rail network, this can lead to some pretty nasty and unorganised lists.
 
 Or perhaps you'd like some stations to be at the top of the list because they're used more often. Like an on-demand Train Mall system.
 
@@ -27,6 +27,7 @@ Satisfactory currently does not have a way of changing the order of Stations and
 (Some antiviruses might not like this. Create an exception, or consider to run from source instead of using the release .exe)
    - If you rather run from source instead of downloading a release, download and install [Python](https://www.python.org/downloads/) and download [train_rearrenger.py](./train_rearranger.py) from this repo.
 2. In file explorer, drag and drop your savefile onto the `train_rearrenger.exe/py` file.
+![](./img/drag_and_drop.png)
 3. Two text files will be created: `station list.txt` and `train list.txt`. Read the program's instructions and edit the files to your liking.
 ![](./img/reorder_instructions.png)
 4. Don't forget to save the text files!
@@ -43,7 +44,7 @@ A new save file will only be generated if both text files contain all of the nam
   - No worries! Though they can only stay in the same relative order. Meaning if you have 2 Trains named "ChooChoo", the first "ChooChoo" in the old list will always be the first "ChooChoo" in the new list, second the second, etc.
 - Does rearranging the Stations mess with any of the Self-Driving Trains?
   - No, all Trains will continue working as intended. This tool only changes the Time Table's visual list order.
-- Does this tool work with several seperated rail networks?
+- Does this tool work with several separated rail networks?
   - Yes, it'll work. If you have separate rail networks it will put all Stations and Trains into the same text file, but the game will still know that they are separate networks.
 - Will you make a version with a proper user interface?
   - I have no plans for it, this currently works well enough for me. Feel free to fork and improve it though!
